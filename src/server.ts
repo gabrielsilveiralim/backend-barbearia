@@ -1,16 +1,15 @@
-import express from 'express';
-import cors from 'cors';
+import Fastify from "fastify";
+import cors from "@fastify/cors";
 import "dotenv/config";
-import { router } from './routes';
+import { userRoutes } from "./routes/userRoutes";
 
-const app = express();
+const app = Fastify();
 
-app.use(express.json());
-app.use(cors());
-app.use(router);
+app.register(cors);
+app.register(userRoutes);
 
-const PORT = process.env.PORT || 3000;
+const PORT = Number(process.env.PORT) || 3000;
 
-app.listen(PORT, () => {
-    console.log("Server is running on port " + PORT);
+app.listen({ port: PORT }, () => {
+  console.log("Server is running on port " + PORT);
 });

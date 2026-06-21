@@ -1,16 +1,45 @@
-import { Request, Response } from "express";
-import { CreateUserService } from "../../service/users/CreateUserService";
+import type { FastifyRequest, FastifyReply } from "fastify";
+import { createUser } from "../../service/users/createUserService";
+import { AppError, EmailAlreadyInUseError, ForbiddenRoleError } from "../../errors/Apperror";
 
-class CreateUserController {
-    async handle(req: Request, res: Response) {
-        const { name, email, password } = req.body;
-        console.log("Received data:", { name, email, password });
+type CreateUserBody = {
+  name: string;
+  email: string;
+  password: string;
+  phone?: string;
+  role?: "client" | "barber" | "admin";
+};
 
-        const createUserService = new CreateUserService();
-        const user =await createUserService.execute();
-        
-        res.json(user);
+export async function createUserController(
+  request: FastifyRequest<{ Body: CreateUserBody }>,
+  reply: FastifyReply
+) {
+  const { name, email, password, phone, role } = request.body;
+
+  if (!name || !email || !password) {
+    return reply.status(400).send({ error: "name, email e password são obrigatórios." });
+  }
+  const requesterRole = (request as any).user?.role as
+    | "client"
+    | "barber"
+    | "admin"
+    | undefined;
+
+  try {
+    const user = await createUser({ name, email, password, phone, role }, requesterRole);
+    return reply.status(201).send(user);
+  } catch (error) {
+    if (error instanceof EmailAlreadyInUseError) {
+      return reply.status(409).send({ error: error.message });
     }
-}
+    if (error instanceof ForbiddenRoleError) {
+      return reply.status(403).send({ error: error.message });
+    }
+    if (error instanceof AppError) {
+      return reply.status(400).send({ error: error.message });
+    }
 
-export { CreateUserController };
+    request.log.error(error);
+    return reply.status(500).send({ error: "Erro interno ao criar usuário." });
+  }
+}
